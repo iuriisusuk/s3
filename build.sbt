@@ -10,6 +10,9 @@ libraryDependencies ++= Seq(
 
 enablePlugins(DockerPlugin)
 
+val creds = settingKey[String]("creds")
+creds := sys.props.getOrElse("creds", "credentials")
+
 dockerfile in docker := {
   val jarFile: File = sbt.Keys.`package`.in(Compile, packageBin).value
   val classpath = (managedClasspath in Compile).value
@@ -18,9 +21,11 @@ dockerfile in docker := {
   // Make a colon separated classpath with the JAR file
   val classpathString = classpath.files.map("/app/" + _.getName)
     .mkString(":") + ":" + jarTarget
+
   new Dockerfile {
     // Base image
     from("java")
+    add(new File(creds.value), "/root/.aws/credentials")
     // Add all files on the classpath
     add(classpath.files, "/app/")
     // Add the JAR file
