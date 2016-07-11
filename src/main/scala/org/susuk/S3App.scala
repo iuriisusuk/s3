@@ -1,5 +1,6 @@
 package org.susuk
 
+import java.io.File
 import java.util.UUID
 
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
@@ -10,8 +11,8 @@ import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3}
 
 import scala.util.Try
 
-object S3Main extends App {
-  println("S3 start")
+object S3App extends App {
+  println("test S3 start")
 
   val s3client: AmazonS3 = new AmazonS3Client(new ProfileCredentialsProvider())
   s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
@@ -27,11 +28,35 @@ object S3Main extends App {
       println(exc.getErrorCode)
       println(exc.getErrorType)
       println(exc.getRequestId)
+      exc.getMessage
     case exc: AmazonClientException =>
       println(exc.getMessage)
+      exc.getMessage
     case exc: Exception =>
       println(exc.getMessage)
+      exc.getMessage
   }
 
-  println("S3 stop")
+  val fileName = "log"
+  val logFile: File = new File(fileName)
+  Try {
+    println("S3 upload log")
+    s3client.putObject(bucketName, "", logFile)
+  } recover {
+    case exc: AmazonServiceException =>
+      println(exc.getMessage)
+      println(exc.getStatusCode)
+      println(exc.getErrorCode)
+      println(exc.getErrorType)
+      println(exc.getRequestId)
+      exc.getMessage
+    case exc: AmazonClientException =>
+      println(exc.getMessage)
+      exc.getMessage
+    case exc: Exception =>
+      println(exc.getMessage)
+      exc.getMessage
+  }
+
+  println("test S3 stop")
 }

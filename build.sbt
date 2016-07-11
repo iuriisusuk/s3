@@ -25,6 +25,7 @@ dockerfile in docker := {
   new Dockerfile {
     // Base image
     from("java")
+    label("aws.api", "s3")
     add(new File(creds.value), "/root/.aws/credentials")
     // Add all files on the classpath
     add(classpath.files, "/app/")
