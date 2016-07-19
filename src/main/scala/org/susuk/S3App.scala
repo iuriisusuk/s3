@@ -1,43 +1,18 @@
 package org.susuk
 
-import java.io.{PrintWriter, File}
+import java.io._
 import java.util.UUID
 
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
-import com.amazonaws.services.s3.model.{BucketVersioningConfiguration, SetBucketVersioningConfigurationRequest, CreateBucketRequest}
+import com.amazonaws.services.s3.model._
 import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3}
 
 import scala.util.Try
 
 object S3App extends App {
   println("test S3 start")
-
-  val s3client: AmazonS3 = new AmazonS3Client(new ProfileCredentialsProvider())
-  s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
-
-  val bucketName = "logs-" + UUID.randomUUID
-  Try {
-    println(s"S3 create bucket: ${bucketName}")
-    s3client.createBucket(new CreateBucketRequest(bucketName))
-    s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
-      bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
-  } recover {
-    case exc: AmazonServiceException =>
-      println(exc.getMessage)
-      println(exc.getStatusCode)
-      println(exc.getErrorCode)
-      println(exc.getErrorType)
-      println(exc.getRequestId)
-      exc.getMessage
-    case exc: AmazonClientException =>
-      println(exc.getMessage)
-      exc.getMessage
-    case exc: Exception =>
-      println(exc.getMessage)
-      exc.getMessage
-  }
 
   val logFile = {
     val logFilePrefix = "tmp-"
@@ -51,14 +26,60 @@ object S3App extends App {
     logFile
   }
 
-  Try {
-    println(s"S3 upload log file: ${logFile.getName}")
-    s3client.putObject(bucketName, logFile.getName, logFile)
+  val s3client: AmazonS3 = new AmazonS3Client(new ProfileCredentialsProvider())
+  s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
+
+  val bucketName = "logs-" + UUID.randomUUID
+
+  val createBucket = Try {
+    println(s"S3 create bucket: ${bucketName}")
+    val bucket = s3client.createBucket(
+      new CreateBucketRequest(bucketName))
+    s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
+      bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
+    bucket
   }
 
-  Try {
+  val uploadObject = Try {
+    println(s"S3 upload log file: ${logFile.getName}")
+    s3client.putObject(
+      new PutObjectRequest(bucketName, logFile.getName, logFile))
+  }
+
+  val deleteObject = Try {
     println(s"S3 delete log file: ${logFile.getName}")
-    s3client.deleteObject(bucketName, logFile.getName)
+    s3client.deleteObject(
+      new DeleteObjectRequest(bucketName, logFile.getName))
+  }
+
+  val downloadObjectWithSpecifiedVersion = Try {
+    println(s"S3 get object with version: ${uploadObject.get.getVersionId}")
+    s3client.getObject(
+      new GetObjectRequest(bucketName, logFile.getName)
+        .withVersionId(uploadObject.get.getVersionId))
+  }
+
+  val test = for {
+    bucket <- createBucket
+    putObjectResult <- uploadObject
+    _ <- deleteObject
+    specificVersionOfS3Object <- downloadObjectWithSpecifiedVersion
+  } yield specificVersionOfS3Object.getKey
+
+  test recover {
+    case exc: AmazonServiceException =>
+      println(exc.getMessage)
+      println(exc.getStatusCode)
+      println(exc.getErrorCode)
+      println(exc.getErrorType)
+      println(exc.getRequestId)
+      exc.getMessage
+    case exc: AmazonClientException =>
+      println(exc.getMessage)
+      exc.getMessage
+    case exc: Exception =>
+      println(exc.getMessage)
+      exc.getMessage
   }
 
   println("test S3 stop")
