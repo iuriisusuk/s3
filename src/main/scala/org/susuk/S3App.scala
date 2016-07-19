@@ -1,6 +1,6 @@
 package org.susuk
 
-import java.io.File
+import java.io.{PrintWriter, File}
 import java.util.UUID
 
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
@@ -19,7 +19,7 @@ object S3App extends App {
 
   val bucketName = "logs-" + UUID.randomUUID
   Try {
-    println("S3 create bucket: " + bucketName)
+    println(s"S3 create bucket: ${bucketName}")
     s3client.createBucket(new CreateBucketRequest(bucketName))
   } recover {
     case exc: AmazonServiceException =>
@@ -37,11 +37,21 @@ object S3App extends App {
       exc.getMessage
   }
 
-  val fileName = "log"
-  val logFile: File = new File(fileName)
+  val logFile = {
+    val logFilePrefix = "tmp-"
+    val logFileSuffix = ".log"
+    val logFile: File = File.createTempFile(logFilePrefix, logFileSuffix)
+
+    val writer = new PrintWriter(logFile)
+    writer.write("Hello AWS S3!")
+    writer.close()
+
+    logFile
+  }
+
   Try {
-    println("S3 upload log")
-    s3client.putObject(bucketName, "", logFile)
+    println(s"S3 upload log file: ${logFile.getName}")
+    s3client.putObject(bucketName, logFile.getName, logFile)
   } recover {
     case exc: AmazonServiceException =>
       println(exc.getMessage)
