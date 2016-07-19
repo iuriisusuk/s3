@@ -5,37 +5,54 @@ s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
 ```
 
 ## Create Bucket
+Versioning is enabled to show that file was indeed created and then got a *Delete Marker*
 ```
-val bucketName = "logs-" + UUID.randomUUID
-Try {
-  println("S3 create bucket: " + bucketName)
-  s3client.createBucket(new CreateBucketRequest(bucketName))
-} recover {
-  case exc: AmazonServiceException =>
-    println(exc.getMessage)
-    println(exc.getStatusCode)
-    println(exc.getErrorCode)
-    println(exc.getErrorType)
-    println(exc.getRequestId)
-  case exc: AmazonClientException =>
-    println(exc.getMessage)
-  case exc: Exception =>
-    println(exc.getMessage)
-}
+  Try {
+      println(s"S3 create bucket: ${bucketName}")
+      s3client.createBucket(new CreateBucketRequest(bucketName))
+      s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
+        bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
+    } recover {
+      case exc: AmazonServiceException =>
+        println(exc.getMessage)
+        println(exc.getStatusCode)
+        println(exc.getErrorCode)
+        println(exc.getErrorType)
+        println(exc.getRequestId)
+        exc.getMessage
+      case exc: AmazonClientException =>
+        println(exc.getMessage)
+        exc.getMessage
+      case exc: Exception =>
+        println(exc.getMessage)
+        exc.getMessage
+    }
 
 ```
 
-## Upload
+## Upload Log File
+```
+  Try {
+    println(s"S3 upload log file: ${logFile.getName}")
+    s3client.putObject(bucketName, logFile.getName, logFile)
+  }
+```
 
+## Delete Log File
+```
+  Try {
+    println(s"S3 delete log file: ${logFile.getName}")
+    s3client.deleteObject(bucketName, logFile.getName)
+  }
+```
 
-## Delete
+## Delete Bucket
+Bucket can be deleted only if it's empty (if versioning is enabled then all file versions should be deleted as well).
+```
+tbd
+```
+
+## Test
 
 ## App README
-
-
-## App Prerequisites
-
-1. [AWS credentials file](http://http://docs.aws.amazon.com/java-sdk/latest/developer-guide/credentials.html) with permissions to access S3.
-2. [Docker](http://www.docker.com/)
-3. [Java 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
-4. [sbt](http://www.scala-sbt.org/)
+On [Bitbucket](https://bitbucket.org/yuriy_susuk/s3/overview)
