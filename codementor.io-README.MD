@@ -1,6 +1,5 @@
 ## Introduction
-
-
+We will put actions on S3 into Try monad.
 
 ## AWS S3 API
 
@@ -13,20 +12,23 @@ s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
 ### Create Bucket
  
 ```
-  Try {
-      println(s"S3 create bucket: ${bucketName}")
-      s3client.createBucket(new CreateBucketRequest(bucketName))
-      s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
-        bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
-    }
+  val createBucket = Try {
+    println(s"S3 create bucket: ${bucketName}")
+    val bucket = s3client.createBucket(
+      new CreateBucketRequest(bucketName))
+    s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
+      bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
+    bucket
+  }
 ```
 
 ### Upload Log File
 
 ```
-  Try {
+  val uploadObject = Try {
     println(s"S3 upload log file: ${logFile.getName}")
-    s3client.putObject(bucketName, logFile.getName, logFile)
+    s3client.putObject(
+      new PutObjectRequest(bucketName, logFile.getName, logFile))
   }
 ```
 
@@ -34,9 +36,10 @@ s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
 
 If versioning is enabled then delete will put a *Delete Marker* on the last version of the file.
 ```
-  Try {
+  val deleteObject = Try {
     println(s"S3 delete log file: ${logFile.getName}")
-    s3client.deleteObject(bucketName, logFile.getName)
+    s3client.deleteObject(
+      new DeleteObjectRequest(bucketName, logFile.getName))
   }
 ```
 
@@ -44,11 +47,13 @@ If versioning is enabled then delete will put a *Delete Marker* on the last vers
 
 If versioning is enabled then specific version of the file can be downloaded (even after deletion).
 ```
-Try {
-    println(s"S3 get object with specified version")
-    s3client.getObject(
-      new GetObjectRequest(bucketName, logFile.getName)
-        .withVersionId(uploadObject.get.getVersionId))
+  val downloadObject = { versionId: String =>
+    Try {
+      println(s"S3 get object with version: ${versionId}")
+      s3client.getObject(
+        new GetObjectRequest(bucketName, logFile.getName)
+          .withVersionId(versionId))
+    }
   }
 ```
 
@@ -67,8 +72,8 @@ Since Try is a Monad, we can put our operations in a sequence.
     bucket <- createBucket
     putObjectResult <- uploadObject
     _ <- deleteObject
-    specificVersionOfS3Object <- downloadObjectWithSpecifiedVersion
-  } yield specificVersionOfS3Object.getKey
+    specificVersionOfS3Object <- downloadObject(putObjectResult.getVersionId)
+  } yield ()
 ```
 
 ### Exceptions and Recovery
