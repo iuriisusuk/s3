@@ -52,19 +52,21 @@ object S3App extends App {
       new DeleteObjectRequest(bucketName, logFile.getName))
   }
 
-  val downloadObjectWithSpecifiedVersion = Try {
-    println(s"S3 get object with version: ${uploadObject.get.getVersionId}")
-    s3client.getObject(
-      new GetObjectRequest(bucketName, logFile.getName)
-        .withVersionId(uploadObject.get.getVersionId))
+  val downloadObject = { versionId: String =>
+    Try {
+      println(s"S3 get object with version: ${versionId}")
+      s3client.getObject(
+        new GetObjectRequest(bucketName, logFile.getName)
+          .withVersionId(versionId))
+    }
   }
 
   val test = for {
     bucket <- createBucket
     putObjectResult <- uploadObject
     _ <- deleteObject
-    specificVersionOfS3Object <- downloadObjectWithSpecifiedVersion
-  } yield specificVersionOfS3Object.getKey
+    specificVersionOfS3Object <- downloadObject(putObjectResult.getVersionId)
+  } yield ()
 
   test recover {
     case exc: AmazonServiceException =>
