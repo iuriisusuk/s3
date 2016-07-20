@@ -1,5 +1,6 @@
 ## Introduction
-We will put actions on S3 into Try monad.
+In this tutorial we will see basic s3 actions: create/delete bucket, upload/download/delete object and versioning.
+We will use the power of Try monad to sequence our commands and do basic failover.
 
 ## AWS S3 API
 
@@ -72,7 +73,7 @@ Since Try is a Monad, we can put our operations in a sequence.
     bucket <- createBucket
     putObjectResult <- uploadObject
     _ <- deleteObject
-    specificVersionOfS3Object <- downloadObject(putObjectResult.getVersionId)
+    s3Obj <- downloadObject(putObjectResult.getVersionId)
   } yield ()
 ```
 
@@ -98,6 +99,6 @@ Test sequence will exit whenever one of the operations breaks and print detailed
   }
 ```
 
-## Test App
+## App
 
-[Bitbucket](https://bitbucket.org/yuriy_susuk/s3/overview)
+On [Bitbucket](https://bitbucket.org/yuriy_susuk/s3/overview) you can find a src code and complete description on how to build and run test application.

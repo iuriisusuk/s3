@@ -65,7 +65,7 @@ object S3App extends App {
     bucket <- createBucket
     putObjectResult <- uploadObject
     _ <- deleteObject
-    specificVersionOfS3Object <- downloadObject(putObjectResult.getVersionId)
+    s3Obj <- downloadObject(putObjectResult.getVersionId)
   } yield ()
 
   test recover {
