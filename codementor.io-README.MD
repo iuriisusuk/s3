@@ -1,6 +1,6 @@
 ## Introduction
-In this tutorial we will see basic s3 actions: create/delete bucket, upload/download/delete object and versioning.
-We will use the power of Try monad to sequence our commands and do basic failover.
+In this tutorial we will see basic s3 operations: create/delete bucket, upload/download/delete object and versioning.
+We will use Kleisli monad to sequence operations and Try monad to do basic failover.
 
 ## AWS S3 API
 
@@ -62,12 +62,11 @@ If versioning is enabled then specific version of the file can be downloaded (ev
 
 Bucket can be deleted only if it's empty (if versioning is enabled then all file versions should be deleted as well).
 ```
-tbd
+a
 ```
 
-### Sequence
-
-Since Try is a Monad, we can put our operations in a sequence.
+### Sequence of Operations
+Since Kleisli is a Monad, we can put our operations in a sequence.
 ```
   val test = for {
     bucket <- createBucket
@@ -77,12 +76,19 @@ Since Try is a Monad, we can put our operations in a sequence.
   } yield ()
 ```
 
+### Sequence of Operations Application
+
+```
+  val bucketName = "logs-" + UUID.randomUUID
+  val res = test(bucketName)
+```
+
 ### Exceptions and Recovery
 AWS Api can generally throws two types of Exceptions: AmazonClientException and AmazonServiceException.
 Test sequence will exit whenever one of the operations breaks and print detailed issue description.
 
 ```
-  test recover {
+  res recover {
     case exc: AmazonServiceException =>
       println(exc.getMessage)
       println(exc.getStatusCode)

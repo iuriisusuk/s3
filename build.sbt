@@ -1,11 +1,12 @@
 name := "s3"
 version := "0.0.1"
-scalaVersion := "2.11.7"
+scalaVersion := "2.11.8"
 
 val awsVersion = "1.10.76"
 
 libraryDependencies ++= Seq(
-  "com.amazonaws" % "aws-java-sdk-s3" % awsVersion
+  "com.amazonaws" % "aws-java-sdk-s3" % awsVersion,
+  "org.typelevel" %% "cats" % "0.6.1"
 )
 
 enablePlugins(DockerPlugin)

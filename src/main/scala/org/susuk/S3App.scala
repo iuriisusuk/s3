@@ -3,13 +3,17 @@ package org.susuk
 import java.io._
 import java.util.UUID
 
+import cats._
+import cats.data.{Xor, Kleisli}
+import cats.std.all._
+
 import com.amazonaws.{AmazonClientException, AmazonServiceException}
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.regions.{Region, Regions}
 import com.amazonaws.services.s3.model._
 import com.amazonaws.services.s3.{AmazonS3Client, AmazonS3}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 object S3App extends App {
   println("test S3 start")
@@ -29,35 +33,68 @@ object S3App extends App {
   val s3client: AmazonS3 = new AmazonS3Client(new ProfileCredentialsProvider())
   s3client.setRegion(Region.getRegion(Regions.US_EAST_1))
 
-  val bucketName = "logs-" + UUID.randomUUID
+  type S3OperationResult[T] = AmazonClientException Xor T
 
-  val createBucket = Try {
-    println(s"S3 create bucket: ${bucketName}")
-    val bucket = s3client.createBucket(
-      new CreateBucketRequest(bucketName))
-    s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
-      bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
-    bucket
+  implicit def toXor[T](tr: Try[T]): S3OperationResult[T] = {
+    tr match {
+      case Success(bucket) => Xor.Right(bucket)
+      case Failure(exc: AmazonClientException) => Xor.Left(exc)
+    }
   }
 
-  val uploadObject = Try {
-    println(s"S3 upload log file: ${logFile.getName}")
-    s3client.putObject(
-      new PutObjectRequest(bucketName, logFile.getName, logFile))
+  val createBucket = Kleisli[S3OperationResult, String, Bucket] { bucketName: String =>
+    Try {
+      println(s"S3 create bucket: ${bucketName}")
+      val bucket = s3client.createBucket(
+        new CreateBucketRequest(bucketName))
+      s3client.setBucketVersioningConfiguration(new SetBucketVersioningConfigurationRequest(
+        bucketName, new BucketVersioningConfiguration(BucketVersioningConfiguration.ENABLED)))
+      bucket
+    }
   }
 
-  val deleteObject = Try {
-    println(s"S3 delete log file: ${logFile.getName}")
-    s3client.deleteObject(
-      new DeleteObjectRequest(bucketName, logFile.getName))
+  val uploadObject = Kleisli[S3OperationResult, String, PutObjectResult] { bucketName: String =>
+    Try {
+      println(s"S3 upload log file: ${logFile.getName}")
+      s3client.putObject(
+        new PutObjectRequest(bucketName, logFile.getName, logFile))
+    }
+  }
+
+  val deleteObject = Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
+    Try {
+      println(s"S3 delete log file: ${logFile.getName}")
+      s3client.deleteObject(
+        new DeleteObjectRequest(bucketName, logFile.getName))
+    }
   }
 
   val downloadObject = { versionId: String =>
-    Try {
-      println(s"S3 get object with version: ${versionId}")
-      s3client.getObject(
-        new GetObjectRequest(bucketName, logFile.getName)
-          .withVersionId(versionId))
+    Kleisli[S3OperationResult, String, S3Object] { bucketName: String =>
+      Try {
+        println(s"S3 get object with version: ${versionId}")
+        s3client.getObject(
+          new GetObjectRequest(bucketName, logFile.getName)
+            .withVersionId(versionId))
+      }
+    }
+  }
+
+  val emptyAndDeleteBucket = { versionId: String =>
+    Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
+      Try {
+        println(s"S3 delete bucket: ${bucketName}")
+        val versionListing = s3client.listVersions(
+          new ListVersionsRequest()
+            .withBucketName(bucketName))
+
+        import scala.collection.JavaConverters._
+
+        for (s3VersionSummary <- versionListing.getVersionSummaries.iterator().asScala) {
+          s3client.deleteVersion(bucketName, s3VersionSummary.getKey(), s3VersionSummary.getVersionId())
+        }
+        s3client.deleteBucket(bucketName)
+      }
     }
   }
 
@@ -66,9 +103,13 @@ object S3App extends App {
     putObjectResult <- uploadObject
     _ <- deleteObject
     s3Obj <- downloadObject(putObjectResult.getVersionId)
+    //_ <- emptyAndDeleteBucket(putObjectResult.getVersionId)
   } yield ()
 
-  test recover {
+  val bucketName = "logs-" + UUID.randomUUID
+  val res = test(bucketName)
+
+  res recover {
     case exc: AmazonServiceException =>
       println(exc.getMessage)
       println(exc.getStatusCode)
