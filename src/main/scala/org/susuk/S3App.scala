@@ -53,19 +53,23 @@ object S3App extends App {
     }
   }
 
-  val uploadObject = Kleisli[S3OperationResult, String, PutObjectResult] { bucketName: String =>
-    Try {
-      println(s"S3 upload log file: ${logFile.getName}")
-      s3client.putObject(
-        new PutObjectRequest(bucketName, logFile.getName, logFile))
+  val uploadObject = { logFile: File =>
+    Kleisli[S3OperationResult, String, PutObjectResult] { bucketName: String =>
+      Try {
+        println(s"S3 upload log file: ${logFile.getName}")
+        s3client.putObject(
+          new PutObjectRequest(bucketName, logFile.getName, logFile))
+      }
     }
   }
 
-  val deleteObject = Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
-    Try {
-      println(s"S3 delete log file: ${logFile.getName}")
-      s3client.deleteObject(
-        new DeleteObjectRequest(bucketName, logFile.getName))
+  val deleteObject = { logFileName: String =>
+    Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
+      Try {
+        println(s"S3 delete log file: ${logFileName}")
+        s3client.deleteObject(
+          new DeleteObjectRequest(bucketName, logFileName))
+      }
     }
   }
 
@@ -80,30 +84,29 @@ object S3App extends App {
     }
   }
 
-  val emptyAndDeleteBucket = { versionId: String =>
-    Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
-      Try {
-        println(s"S3 delete bucket: ${bucketName}")
-        val versionListing = s3client.listVersions(
-          new ListVersionsRequest()
-            .withBucketName(bucketName))
+  val emptyAndDeleteBucket = Kleisli[S3OperationResult, String, Unit] { bucketName: String =>
+    Try {
+      println(s"S3 delete bucket: ${bucketName}")
+      val versionListing = s3client.listVersions(
+        new ListVersionsRequest()
+          .withBucketName(bucketName))
 
-        import scala.collection.JavaConverters._
+      import scala.collection.JavaConverters._
 
-        for (s3VersionSummary <- versionListing.getVersionSummaries.iterator().asScala) {
-          s3client.deleteVersion(bucketName, s3VersionSummary.getKey(), s3VersionSummary.getVersionId())
-        }
-        s3client.deleteBucket(bucketName)
+      for (s3VersionSummary <- versionListing.getVersionSummaries.iterator().asScala) {
+        s3client.deleteVersion(bucketName, s3VersionSummary.getKey(), s3VersionSummary.getVersionId())
       }
+      s3client.deleteBucket(bucketName)
     }
   }
 
+
   val test = for {
     bucket <- createBucket
-    putObjectResult <- uploadObject
-    _ <- deleteObject
+    putObjectResult <- uploadObject(logFile)
+    _ <- deleteObject(logFile.getName)
     s3Obj <- downloadObject(putObjectResult.getVersionId)
-    //_ <- emptyAndDeleteBucket(putObjectResult.getVersionId)
+  //_ <- emptyAndDeleteBucket
   } yield ()
 
   val bucketName = "logs-" + UUID.randomUUID
@@ -118,9 +121,6 @@ object S3App extends App {
       println(exc.getRequestId)
       exc.getMessage
     case exc: AmazonClientException =>
-      println(exc.getMessage)
-      exc.getMessage
-    case exc: Exception =>
       println(exc.getMessage)
       exc.getMessage
   }
