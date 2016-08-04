@@ -1,3 +1,5 @@
+# Algebra based (functional) API design on top of AWS S3 Java API using Scala
+
 ## Introduction
 In this tutorial we will see basic s3 operations: create/delete bucket, upload/download/delete object and versioning.
 We will try to isolate our impure code.
@@ -166,4 +168,61 @@ Test sequence will exit whenever one of the operations breaks and print detailed
 
 ## App
 
-On [Bitbucket](https://bitbucket.org/yuriy_susuk/s3/overview) you can find a src code and complete description on how to build and run test application.
+### Prerequisites
+       
+1. [AWS credentials file](http://http://docs.aws.amazon.com/java-sdk/latest/developer-guide/credentials.html) with permissions to access S3.
+2. [Docker](http://www.docker.com/)
+3. [Java 8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html)
+4. [sbt](http://www.scala-sbt.org/)
+
+### Running
+
+You can find a src code on [Bitbucket](https://bitbucket.org/yuriy_susuk/s3/overview).
+
+Since S3 App is running in Docker Container you need to build a Docker Image.
+
+To create a Dockerfile (creds system property defines path to your AWS credentials file):
+
+```
+sbt -Dcreds="path/to/credentials" clean docker
+
+```
+
+To build a Docker Image from the Dockerfile (this will take some time to download java image from Docker Hub):
+
+```
+$ cd target/docker
+$ docker build .
+```
+
+To check that image is created (lists images with the label aws.s3 that has a value s3):
+
+```
+docker images --filter "label=aws.api=s3"
+
+```
+
+To run S3App in Docker Container:
+
+```
+docker run default/s3
+
+```
+
+### Q & A
+
+q. Why Docker?
+a. Main reason is to have an isolated env to run examples (e.g. you most probably already have default creds saved some where in
+the root path, that can interfere with the tests we are running)
+
+## Conclusion
+
+First of all we saw how to use AWS S3 Java API using Scala programming language. We implemented creation, deletion and empting the bucket. Object upload and
+download was as well described in details. Since Scala incorporates capabilities of FP language, we build Algebra based API, that means first of all
+clear (behaviour driven), composable (based on Algebraic Data Types) and verifiable (based on Algebraic laws) API. For that we used Xor and Kleisli monads.
+
+We saw how Xor monad can be used to encapsulate an error effect (Left indicates the problem and Right indicates the success). As well we saw
+how Kleisli monad is used to delay the moment of the function sequence execution before some configuration is passed (bucketName in our case or in more
+complex cases - db/connection configuration). Here the nature of Kleisli is very similar to Reader monad (Reader monad is basically represented through Kleisli).
+
+Now it's clear what is the advantages of using Scala, especially its functional capabilities. We now can use Xor and Kleisli as base for Algebra based API.
